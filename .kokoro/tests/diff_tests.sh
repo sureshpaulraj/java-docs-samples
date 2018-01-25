@@ -39,25 +39,31 @@ export GOOGLE_CLOUD_PROJECT=java-docs-samples-testing
 
 echo "******************** CHECKING FOR AFFECTED FOLDERS ********************"
 # Diff to find out what has changed from master
-find ./*/ -name pom.xml -print0 | sort | while read -d $'\0' file
+#cd github/java-docs-samples
+find ./*/ -name pom.xml -print0 | sort -z | while read -d $'\0' file
 do
     file=$(dirname "$file")
     echo "------------------------------------------------------------"
-    echo "! checking $file"
+    echo "- checking $file"
     echo "------------------------------------------------------------"
 
 
     pushd "$file" > /dev/null
+    set +e
+    git diff --quiet master.. .
+    RTN=$?
+    set -e
 
     # Check for changes to the current folder
-    if ! git diff --quiet master.. --; then
-        echo -e "\n Change found. \n"
-        mvn --batch-mode --fail-at-end clean verify \
+    if [ "$RTN" -eq 1 ]; then
+        echo -e "\n Change detected. Running tests. \n "
+        mvn -q --batch-mode --fail-at-end clean verify \
            -Dfile.encoding="UTF-8" \
            -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn \
            -Dmaven.test.redirectTestOutputToFile=true \
            -Dbigtable.projectID="${GOOGLE_CLOUD_PROJECT}" \
            -Dbigtable.instanceID=instance
+        echo -e " Tests complete. \n"
     else
         echo -e "\n NO change found. \n"
     fi
